@@ -1,10 +1,16 @@
-use bevy::app::AppExit;
-use bevy::prelude::*;
+use bevy::{
+    app::AppExit,
+    prelude::*,
+    window::{CursorGrabMode, CursorOptions},
+};
+use player::PlayerPlugin;
+
+mod player;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_systems(Startup, setup)
+        .add_plugins((DefaultPlugins, PlayerPlugin))
+        .add_systems(Startup, (setup, cursor_grab))
         .add_systems(Update, exit_on_esc)
         .run();
 }
@@ -15,18 +21,13 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    // circular base
+    // floor
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::new(Vec3::Y, Vec2::new(5.0, 5.0)))),
         MeshMaterial3d(materials.add(Color::WHITE)),
         Transform::from_xyz(0.0, 0.0, 0.0),
     ));
-    // cube
-    commands.spawn((
-        Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
-        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
-        Transform::from_xyz(0.0, 0.5, 0.0),
-    ));
+
     // light
     commands.spawn((
         PointLight {
@@ -35,11 +36,11 @@ fn setup(
         },
         Transform::from_xyz(4.0, 8.0, 4.0),
     ));
-    // camera
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
+}
+
+fn cursor_grab(mut cursor_options: Single<&mut CursorOptions>) {
+    cursor_options.grab_mode = CursorGrabMode::Locked;
+    cursor_options.visible = false;
 }
 
 fn exit_on_esc(keys: Res<ButtonInput<KeyCode>>, mut message_writer: MessageWriter<AppExit>) {
