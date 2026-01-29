@@ -11,6 +11,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CameraSettings>()
+            .add_plugins(MeshPickingPlugin)
             .add_systems(Startup, (setup_player, setup_camera).chain())
             .add_systems(Update, (player_controls, camera_controls).chain());
     }
@@ -53,6 +54,14 @@ fn setup_player(
         Mesh3d(meshes.add(Capsule3d::new(0.5, 1.0))),
         MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
         Transform::from_xyz(0.0, 1.0, 0.0),
+    ));
+
+    // TODO: Remove when environment is added
+    // obstacle
+    commands.spawn((
+        Mesh3d(meshes.add(Cuboid::new(3.0, 3.0, 1.0))),
+        MeshMaterial3d(materials.add(Color::srgb_u8(124, 144, 255))),
+        Transform::from_xyz(0.0, 1.0, 4.0),
     ));
 }
 
@@ -100,7 +109,8 @@ fn camera_controls(
     camera_settings: Res<CameraSettings>,
     mouse_motion: Res<AccumulatedMouseMotion>,
     mut camera: Single<&mut Transform, (With<MainCamera>, Without<Player>)>,
-    target: Single<&Transform, (With<CameraTarget>, Without<MainCamera>)>,
+    camera_target: Single<&Transform, (With<CameraTarget>, Without<MainCamera>)>,
+    mut ray_cast: MeshRayCast,
 ) {
     let delta = mouse_motion.delta;
     let delta_pitch = -delta.y * camera_settings.pitch_speed;
@@ -113,5 +123,23 @@ fn camera_controls(
     let yaw = yaw - delta_yaw;
 
     camera.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, 0.0);
-    camera.translation = target.translation - camera.forward() * camera_settings.orbit_distance;
+    camera.translation =
+        camera_target.translation - camera.forward() * camera_settings.orbit_distance;
+
+    // TODO: Move ray casting to its own system
+    let ray_pos = camera_target.translation;
+    let ray_dir = -camera.forward().normalize();
+    let ray = Ray3d::new(ray_pos, Dir3::new(ray_dir).unwrap());
+
+    let Some((_, hit)) = ray_cast
+        .cast_ray(ray, &MeshRayCastSettings::default())
+        .first()
+    else {
+        return;
+    };
+
+    if hit.distance < camera_settings.orbit_distance {
+        camera.translation =
+            camera_target.translation - camera.forward().normalize() * (hit.distance - 0.05);
+    }
 }
